@@ -2,15 +2,17 @@
 
 import nltk
 import pandas as pd
-
+import string
 
 def load_data(input_file):
     """Lea el archivo usando pandas y devuelva un DataFrame"""
+    df = pd.read_csv(input_file)
+    return df
 
 
 def create_fingerprint(df):
     """Cree una nueva columna en el DataFrame que contenga el fingerprint de la columna 'text'"""
-
+    
     # 1. Copie la columna 'text' a la columna 'fingerprint'
     # 2. Remueva los espacios en blanco al principio y al final de la cadena
     # 3. Convierta el texto a minúsculas
@@ -20,25 +22,53 @@ def create_fingerprint(df):
     # 7. Transforme cada palabra con un stemmer de Porter
     # 8. Ordene la lista de tokens y remueve duplicados
     # 9. Convierta la lista de tokens a una cadena de texto separada por espacios
+    df =df.copy()
+    df["key"] = df["text"]
+    df["key"] = df["key"].str.strip()#borre espacio en blanco al inicio y final de la cadena
+    df["key"] = df["key"].str.lower()
+    df["key"] = df["key"].str.replace("-", "")
+    df["key"] = df["key"].str.translate(str.maketrans("", "", string.punctuation))  
+    
+    #7
+    df["key"] = df["key"].str.split()
+    stemmer = nltk.PorterStemmer()#genera la raiz de la palabra de todas las variaciones
+    df["key"] = df["key"].apply(lambda x: [stemmer.stem(word) for word in x])
+    #8
+    df["key"] = df["key"].apply(lambda x: sorted(set(x))) #set es un comando donde elimina los duplicados
+    #9
+    #df["key"] = df["key"].apply(lambda x: " ".join(x))
+    df["key"] = df["key"].str.join(" ")
+
+    return df
 
 
 def generate_cleaned_column(df):
     """Crea la columna 'cleaned' en el DataFrame"""
 
-    df = df.copy()
-
     # 1. Ordene el dataframe por 'fingerprint' y 'text'
     # 2. Seleccione la primera fila de cada grupo de 'fingerprint'
     # 3.  Cree un diccionario con 'fingerprint' como clave y 'text' como valor
     # 4. Cree la columna 'cleaned' usando el diccionario
+    df = df.copy()
+    df = df.sort_values(by=["key", "text"], ascending=[True, True])
+    keys = df.drop_duplicates(subset="key", keep="first") #genera otro conjunto con otro tipo de datos
+    #se aparean ahora los datos de la columna key con la columna text, el zip intera apareando 
+    key_dict = dict(zip(keys["key"], keys["text"]))
+    df["cleaned"] = df["key"].map(key_dict)
+    return df
 
 
 def save_data(df, output_file):
     """Guarda el DataFrame en un archivo"""
     # Solo contiene una columna llamada 'texto' al igual
     # que en el archivo original pero con los datos limpios
-
-
+    df = df.copy()
+    df = df[["cleaned"]]
+    df = df.rename(columns={"cleaned": "text"})
+    df.to_csv(output_file, index=False)
+#df = create_fingerprint(load_data("input.txt"))
+#df = generate_cleaned_column(df)
+#print(df)
 def main(input_file, output_file):
     """Ejecuta la limpieza de datos"""
 
